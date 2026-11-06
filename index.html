@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Neon Snake</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 class="neon-title">SNAKE</h1>
+            <div class="scores">
+                <div class="score-box">
+                    <span class="label">СЧЁТ</span>
+                    <span id="score">0</span>
+                </div>
+                <div class="score-box">
+                    <span class="label">РЕКОРД</span>
+                    <span id="best">0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="game-wrapper">
+            <canvas id="game"></canvas>
+            <div id="overlay" class="overlay hidden">
+                <div class="overlay-content">
+                    <h2 id="overlay-title">Пауза</h2>
+                    <p id="overlay-text"></p>
+                    <button id="overlay-btn" class="btn-primary">Продолжить</button>
+                    <button id="overlay-btn2" class="btn-secondary hidden">Топ-10</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="pause-btn" class="btn-secondary">⏸ Пауза</button>
+            <button id="restart-btn" class="btn-secondary">↻ Заново</button>
+            <button id="top-btn" class="btn-secondary">🏆 Топ-10</button>
+        </div>
+
+        <div class="hint">Свайпай или используй стрелки / WASD</div>
+    </div>
+
+    <!-- Модалка топ-10 -->
+    <div id="top-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>🏆 Топ-10 рекордов</h2>
+            <ol id="top-list" class="top-list"></ol>
+            <button id="close-top" class="btn-primary">Закрыть</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
