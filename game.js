@@ -3,7 +3,7 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
     tg.ready();
     tg.expand();
-    tg.setHeaderColor('#0a0e1a');
+    tg.setHeaderColor('#1c1c1e');
 }
 
 // ============ КОНСТАНТЫ ============
@@ -11,19 +11,30 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const GRID = 20;
 
+const COLORS = {
+    bg: '#2c2c2e',
+    grid: 'rgba(255, 255, 255, 0.03)',
+    snakeHead: '#30d158',
+    snakeBody: '#28b74d',
+    food: '#ff453a',
+    gold: '#ffd700',
+    slow: '#0a84ff',
+    maze: '#bf5af2',
+    particle: '#ffffff'
+};
+
 const FOOD_TYPES = {
-    NORMAL: { color: '#ff3366', points: 10, chance: 0.80 },
-    GOLD:   { color: '#ffd700', points: 50, chance: 0.15 },
-    SLOW:   { color: '#39ff14', points: 5,  chance: 0.05 },
+    NORMAL: { color: COLORS.food, points: 10, chance: 0.80 },
+    GOLD:   { color: COLORS.gold, points: 50, chance: 0.15 },
+    SLOW:   { color: COLORS.slow, points: 5,  chance: 0.05 },
 };
 
 const SKINS = [
-    { id: 'cyan',   name: 'Неон',       color: '#00f0ff', head: '#00f0ff', unlock: { type: 'default' } },
-    { id: 'pink',   name: 'Магента',    color: '#ff00d4', head: '#ff00d4', unlock: { type: 'score', value: 50 } },
-    { id: 'green',  name: 'Токсин',     color: '#39ff14', head: '#39ff14', unlock: { type: 'score', value: 150 } },
-    { id: 'gold',   name: 'Золото',     color: '#ffd700', head: '#ffd700', unlock: { type: 'score', value: 300 } },
-    { id: 'purple', name: 'Фиолет',     color: '#9d4edd', head: '#9d4edd', unlock: { type: 'achievement', value: 'gold_10' } },
-    { id: 'rainbow',name: 'Радуга',     color: 'rainbow', head: '#ffffff', unlock: { type: 'achievement', value: 'score_500' } },
+    { id: 'green',  name: 'Классика', color: '#30d158', head: '#30d158', unlock: { type: 'default' } },
+    { id: 'blue',   name: 'Океан',    color: '#0a84ff', head: '#0a84ff', unlock: { type: 'score', value: 50 } },
+    { id: 'purple', name: 'Аметист',  color: '#bf5af2', head: '#bf5af2', unlock: { type: 'score', value: 150 } },
+    { id: 'orange', name: 'Закат',    color: '#ff9f0a', head: '#ff9f0a', unlock: { type: 'score', value: 300 } },
+    { id: 'rainbow',name: 'Радуга',   color: 'rainbow', head: '#ffffff', unlock: { type: 'achievement', value: 'score_500' } },
 ];
 
 const ACHIEVEMENTS = [
@@ -124,7 +135,7 @@ class SnakeGame {
         this.resize();
         window.addEventListener('resize', () => this.resize());
 
-        // Состояние
+        // Состояние игры
         this.snake = [];
         this.dir = { x: 1, y: 0 };
         this.nextDir = { x: 1, y: 0 };
@@ -141,9 +152,6 @@ class SnakeGame {
         this.particles = [];
         this.slowUntil = 0;
         this.newBest = false;
-
-        // Статистика сессии
-        this.stats = { gold: 0, normal: 0, slow: 0 };
         this.gameStats = { gold: 0, normal: 0, slow: 0 };
 
         // Настройки
@@ -158,7 +166,7 @@ class SnakeGame {
         // Прогресс
         this.topScores = LS.get('top', []);
         this.achievements = LS.get('achievements', {});
-        this.skins = LS.get('skins', { active: 'cyan' });
+        this.skins = LS.get('skins', { active: 'green' });
         this.totalGold = LS.get('totalGold', 0);
         this.maxScore = LS.get('maxScore', 0);
         this.tasks = this.loadTasks();
@@ -166,11 +174,12 @@ class SnakeGame {
         this.initUI();
         this.bindEvents();
         this.updateBestUI();
-        this.showOverlay('Готов?', 'Свайпай или используй стрелки', 'Начать игру', null);
+        this.draw(); // Отрисовать пустое поле на фоне
     }
 
     resize() {
         const size = canvas.clientWidth;
+        if (!size) return;
         const dpr = window.devicePixelRatio || 1;
         canvas.width = size * dpr;
         canvas.height = size * dpr;
@@ -180,146 +189,77 @@ class SnakeGame {
         if (this.running) this.draw();
     }
 
-    // ---------- ЗАДАНИЯ ----------
-    loadTasks() {
-        const today = new Date().toDateString();
-        const saved = LS.get('tasks', null);
-        if (saved && saved.date === today) return saved;
-        // Новые задания
-        const shuffled = [...TASK_POOL].sort(() => Math.random() - 0.5);
-        const tasks = shuffled.slice(0, 3).map(t => ({ ...t, progress: 0, done: false }));
-        const data = { date: today, tasks };
-        LS.set('tasks', data);
-        return data;
-    }
-
-    updateTaskProgress(type, amount = 1) {
-        let changed = false;
-        this.tasks.tasks.forEach(t => {
-            if (t.done) return;
-            if (t.type === type) {
-                t.progress = Math.min(t.target, t.progress + amount);
-                if (t.progress >= t.target) {
-                    t.done = true;
-                    toast(`✅ Задание выполнено: ${t.title}`);
-                    this.unlockAchievement('task_' + t.id);
-                }
-                changed = true;
-            }
-        });
-        if (changed) LS.set('tasks', this.tasks);
-    }
-
-    // ---------- ДОСТИЖЕНИЯ ----------
-    unlockAchievement(id) {
-        if (this.achievements[id]) return;
-        const ach = ACHIEVEMENTS.find(a => a.id === id);
-        if (!ach) return;
-        this.achievements[id] = true;
-        LS.set('achievements', this.achievements);
-        sound.achievement();
-        vibrate(100);
-        toast(`${ach.icon} Достижение: ${ach.name}`);
-    }
-
-    checkAchievements() {
-        if (!this.achievements.first_game) this.unlockAchievement('first_game');
-        if (this.score >= 50)   this.unlockAchievement('score_50');
-        if (this.score >= 100)  this.unlockAchievement('score_100');
-        if (this.score >= 500)  this.unlockAchievement('score_500');
-        if (this.snake.length >= 20) this.unlockAchievement('long_20');
-        if (this.totalGold >= 1)  this.unlockAchievement('gold_1');
-        if (this.totalGold >= 10) this.unlockAchievement('gold_10');
-        if (this.settings.noWalls) this.unlockAchievement('no_walls');
-    }
-
-    // ---------- СКИНЫ ----------
-    isSkinUnlocked(skin) {
-        if (skin.unlock.type === 'default') return true;
-        if (skin.unlock.type === 'score') return this.maxScore >= skin.unlock.value;
-        if (skin.unlock.type === 'achievement') return !!this.achievements[skin.unlock.value];
-        return false;
-    }
-
-    getCurrentSkin() {
-        const skin = SKINS.find(s => s.id === this.skins.active) || SKINS[0];
-        return this.isSkinUnlocked(skin) ? skin : SKINS[0];
-    }
-
-    // ---------- UI ----------
+    // ---------- UI ИНИЦИАЛИЗАЦИЯ ----------
     initUI() {
-        // Топ
-        $('close-top').onclick = () => { sound.click(); $('top-modal').classList.add('hidden'); };
-        $('top-btn').onclick = () => { sound.click(); this.showTop(); };
+        // Экраны
+        $('btn-play').onclick = () => {
+            sound.click();
+            $('screen-main').classList.remove('active');
+            $('screen-game').classList.add('active');
+            setTimeout(() => this.resize(), 50); // Пересчитать размер canvas
+            this.start();
+        };
 
-        // Скины
-        $('close-skins').onclick = () => { sound.click(); $('skins-modal').classList.add('hidden'); };
-        $('skins-btn').onclick = () => { sound.click(); this.showSkins(); };
+        // Меню
+        $('btn-menu').onclick = () => { sound.click(); this.togglePause(); $('modal-menu').classList.remove('hidden'); };
+        $('menu-resume').onclick = () => { sound.click(); $('modal-menu').classList.add('hidden'); this.togglePause(); };
+        $('menu-restart').onclick = () => { sound.click(); $('modal-menu').classList.add('hidden'); this.start(); };
+        $('menu-exit').onclick = () => {
+            sound.click();
+            $('modal-menu').classList.add('hidden');
+            $('screen-game').classList.remove('active');
+            $('screen-main').classList.add('active');
+            this.running = false;
+            this.paused = false;
+            this.updateBestUI();
+        };
+
+        // Открытие модалок из меню
+        $('menu-top').onclick = () => { sound.click(); this.showTop(); };
+        $('menu-skins').onclick = () => { sound.click(); this.showSkins(); };
+        $('menu-settings').onclick = () => { sound.click(); this.showSettings(); };
+        $('menu-tasks').onclick = () => { sound.click(); this.showTasks(); };
+        $('menu-achievements').onclick = () => { sound.click(); this.showAchievements(); };
+
+        // Закрытие модалок
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.onclick = () => {
+                sound.click();
+                btn.closest('.modal').classList.add('hidden');
+            };
+        });
+
+        // Оверлей (пауза / смерть)
+        $('overlay-btn').onclick = () => {
+            sound.click();
+            if (this.over) {
+                this.start();
+            } else {
+                $('overlay').classList.add('hidden');
+                this.togglePause();
+            }
+        };
 
         // Настройки
-        $('close-settings').onclick = () => { sound.click(); $('settings-modal').classList.add('hidden'); };
-        $('settings-btn').onclick = () => { sound.click(); this.showSettings(); };
         $('toggle-walls').checked = this.settings.noWalls;
         $('toggle-maze').checked = this.settings.mazeEnabled;
         $('toggle-sound').checked = this.settings.sound;
         $('toggle-vibration').checked = this.settings.vibration;
 
-        $('toggle-walls').onchange = (e) => {
-            this.settings.noWalls = e.target.checked;
-            LS.set('noWalls', this.settings.noWalls);
-            if (this.settings.noWalls) this.unlockAchievement('no_walls');
-        };
-        $('toggle-maze').onchange = (e) => {
-            this.settings.mazeEnabled = e.target.checked;
-            LS.set('mazeEnabled', this.settings.mazeEnabled);
-        };
-        $('toggle-sound').onchange = (e) => {
-            this.settings.sound = e.target.checked;
-            LS.set('sound', this.settings.sound);
-            sound.enabled = this.settings.sound;
-            sound.click();
-        };
-        $('toggle-vibration').onchange = (e) => {
-            this.settings.vibration = e.target.checked;
-            LS.set('vibration', this.settings.vibration);
-            vibrate();
-        };
-
-        // Задания
-        $('close-tasks').onclick = () => { sound.click(); $('tasks-modal').classList.add('hidden'); };
-        $('tasks-btn').onclick = () => { sound.click(); this.showTasks(); };
-
-        // Достижения
-        $('close-achievements').onclick = () => { sound.click(); $('achievements-modal').classList.add('hidden'); };
-
-        // Кнопки управления
-        $('pause-btn').onclick = () => { sound.click(); this.togglePause(); };
-        $('restart-btn').onclick = () => { sound.click(); this.restart(); };
-
-        // Оверлей
-        $('overlay-btn').onclick = () => {
-            sound.click();
-            if (this.over) this.restart();
-            else if (this.paused) this.togglePause();
-            else this.start();
-        };
-        $('overlay-btn2').onclick = () => { sound.click(); this.showTop(); };
-
-        // Тап по заголовку = достижения
-        document.querySelector('.neon-title').onclick = () => { sound.click(); this.showAchievements(); };
+        $('toggle-walls').onchange = (e) => { this.settings.noWalls = e.target.checked; LS.set('noWalls', this.settings.noWalls); };
+        $('toggle-maze').onchange = (e) => { this.settings.mazeEnabled = e.target.checked; LS.set('mazeEnabled', this.settings.mazeEnabled); };
+        $('toggle-sound').onchange = (e) => { this.settings.sound = e.target.checked; LS.set('sound', this.settings.sound); sound.enabled = this.settings.sound; sound.click(); };
+        $('toggle-vibration').onchange = (e) => { this.settings.vibration = e.target.checked; LS.set('vibration', this.settings.vibration); vibrate(); };
     }
 
     bindEvents() {
+        // Клавиатура
         document.addEventListener('keydown', (e) => {
-            const map = {
-                ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-                w: 'up', s: 'down', a: 'left', d: 'right',
-                W: 'up', S: 'down', A: 'left', D: 'right',
-            };
+            const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
             if (map[e.key]) { e.preventDefault(); this.setDirection(map[e.key]); }
-            if (e.key === ' ' || e.key === 'Escape') { e.preventDefault(); this.togglePause(); }
         });
 
+        // Свайпы
         let sx = 0, sy = 0;
         canvas.addEventListener('touchstart', (e) => {
             const t = e.changedTouches[0];
@@ -335,31 +275,27 @@ class SnakeGame {
             else this.setDirection(dy > 0 ? 'down' : 'up');
         }, { passive: true });
 
-        // 👇 НОВЫЙ БЛОК: Управление экранным джойстиком
+        // Джойстик
         document.querySelectorAll('.dpad-btn').forEach(btn => {
             btn.addEventListener('pointerdown', (e) => {
-                e.preventDefault(); // убирает задержку и двойной тап
-                const dir = btn.getAttribute('data-dir');
-                this.setDirection(dir);
-                sound.click(); // звук нажатия
+                e.preventDefault();
+                this.setDirection(btn.getAttribute('data-dir'));
+                sound.click();
             });
         });
-        // 👆 КОНЕЦ НОВОГО БЛОКА
     }
 
+    // ---------- ЛОГИКА ИГРЫ ----------
     setDirection(dirName) {
         if (!this.running || this.paused || this.over) return;
-        const map = {
-            up: { x: 0, y: -1 }, down: { x: 0, y: 1 },
-            left: { x: -1, y: 0 }, right: { x: 1, y: 0 },
-        };
+        const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
         const d = map[dirName];
         if (d.x === -this.dir.x && d.y === -this.dir.y) return;
         this.nextDir = d;
     }
 
-    // ---------- ЖИЗНЕННЫЙ ЦИКЛ ----------
     start() {
+        this.resize();
         this.snake = [{ x: 10, y: 10 }];
         this.dir = { x: 1, y: 0 };
         this.nextDir = { x: 1, y: 0 };
@@ -369,31 +305,27 @@ class SnakeGame {
         this.over = false;
         this.paused = false;
         this.running = true;
-        this.newBest = false;
         this.particles = [];
         this.maze = [];
         this.gameStats = { gold: 0, normal: 0, slow: 0 };
-
+        
+        $('overlay').classList.add('hidden');
         this.spawnFood();
         this.updateScoreUI();
-        this.hideOverlay();
         this.lastTick = performance.now();
         requestAnimationFrame((t) => this.loop(t));
-    }
-
-    restart() {
-        this.hideOverlay();
-        $('top-modal').classList.add('hidden');
-        this.start();
     }
 
     togglePause() {
         if (!this.running || this.over) return;
         this.paused = !this.paused;
         if (this.paused) {
-            this.showOverlay('Пауза', 'Продолжим?', 'Продолжить', null);
+            $('overlay-title').textContent = 'Пауза';
+            $('overlay-text').textContent = 'Отдохните немного';
+            $('overlay-btn').textContent = 'Продолжить';
+            $('overlay').classList.remove('hidden');
         } else {
-            this.hideOverlay();
+            $('overlay').classList.add('hidden');
             this.lastTick = performance.now();
             requestAnimationFrame((t) => this.loop(t));
         }
@@ -402,7 +334,6 @@ class SnakeGame {
     loop(now) {
         if (!this.running || this.paused || this.over) {
             this.draw();
-            if (!this.paused && !this.over && this.running) requestAnimationFrame((t) => this.loop(t));
             return;
         }
         const speed = now < this.slowUntil ? this.speed * 1.8 : this.speed;
@@ -419,7 +350,7 @@ class SnakeGame {
         this.dir = { ...this.nextDir };
         let head = { x: this.snake[0].x + this.dir.x, y: this.snake[0].y + this.dir.y };
 
-        // Телепорт (без стен)
+        // Телепорт
         if (this.settings.noWalls) {
             if (head.x < 0) head.x = GRID - 1;
             if (head.x >= GRID) head.x = 0;
@@ -429,9 +360,7 @@ class SnakeGame {
             if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) return this.gameOver();
         }
 
-        // Столкновение с собой
         if (this.snake.some(s => s.x === head.x && s.y === head.y)) return this.gameOver();
-        // Столкновение с лабиринтом
         if (this.maze.some(m => m.x === head.x && m.y === head.y)) return this.gameOver();
 
         this.snake.unshift(head);
@@ -441,13 +370,14 @@ class SnakeGame {
             this.score += ft.points;
             this.spawnParticles(head.x, head.y, ft.color);
 
-            // Статистика
             this.gameStats[this.foodType.toLowerCase()]++;
             if (this.foodType === 'GOLD') {
                 this.totalGold++;
                 LS.set('totalGold', this.totalGold);
                 sound.gold();
                 this.updateTaskProgress('gold', 1);
+                this.unlockAchievement('gold_1');
+                if (this.totalGold >= 10) this.unlockAchievement('gold_10');
             } else if (this.foodType === 'SLOW') {
                 this.slowUntil = performance.now() + 5000;
                 sound.slow();
@@ -458,24 +388,21 @@ class SnakeGame {
             }
             vibrate();
 
-            // Ускорение каждые 50 очков
             if (Math.floor(this.score / 50) > Math.floor((this.score - ft.points) / 50)) {
                 this.speed = Math.max(70, this.speed - 8);
             }
 
-            // Лабиринт со 100 очков
             if (this.settings.mazeEnabled && this.score >= 100 && this.maze.length === 0) {
                 this.spawnMaze();
             }
 
-            // Задания
             this.updateTaskProgress('score', this.score);
             this.updateTaskProgress('length', this.snake.length);
+            if (this.snake.length >= 20) this.unlockAchievement('long_20');
 
             this.spawnFood();
             this.updateScoreUI();
             this.checkNewRecord();
-            this.checkAchievements();
         } else {
             this.snake.pop();
         }
@@ -512,8 +439,8 @@ class SnakeGame {
     spawnParticles(gx, gy, color) {
         const px = gx * this.tileSize + this.tileSize / 2;
         const py = gy * this.tileSize + this.tileSize / 2;
-        for (let i = 0; i < 12; i++) {
-            const angle = (Math.PI * 2 * i) / 12;
+        for (let i = 0; i < 10; i++) {
+            const angle = (Math.PI * 2 * i) / 10;
             const speed = 2 + Math.random() * 2;
             this.particles.push({ x: px, y: py, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, color });
         }
@@ -524,7 +451,7 @@ class SnakeGame {
         for (const p of this.particles) {
             p.x += p.vx; p.y += p.vy;
             p.vx *= 0.94; p.vy *= 0.94;
-            p.life -= 0.03;
+            p.life -= 0.04;
         }
     }
 
@@ -536,16 +463,21 @@ class SnakeGame {
 
         this.saveScore(this.score);
         this.updateTaskProgress('games', 1);
-        this.checkAchievements();
+        this.unlockAchievement('first_game');
+        if (this.score >= 50) this.unlockAchievement('score_50');
+        if (this.score >= 100) this.unlockAchievement('score_100');
+        if (this.score >= 500) this.unlockAchievement('score_500');
 
-        // Обновляем maxScore
         if (this.score > this.maxScore) {
             this.maxScore = this.score;
             LS.set('maxScore', this.maxScore);
         }
 
         const isRecord = this.score > 0 && this.score === this.topScores[0]?.score;
-        this.showOverlay(isRecord ? '🏆 Новый рекорд!' : 'Игра окончена', `Счёт: ${this.score}`, 'Играть снова', 'Топ-10');
+        $('overlay-title').textContent = isRecord ? '🏆 Новый рекорд!' : 'Игра окончена';
+        $('overlay-text').textContent = `Ваш счёт: ${this.score}`;
+        $('overlay-btn').textContent = 'Играть снова';
+        $('overlay').classList.remove('hidden');
         this.draw();
     }
 
@@ -556,7 +488,9 @@ class SnakeGame {
     }
 
     updateBestUI() {
-        $('best').textContent = this.topScores[0]?.score || 0;
+        const best = this.topScores[0]?.score || 0;
+        $('main-best').textContent = best;
+        $('best').textContent = best;
     }
 
     checkNewRecord() {
@@ -564,7 +498,7 @@ class SnakeGame {
         if (this.score > prevBest && !this.newBest) { this.newBest = true; vibrate(150); }
     }
 
-    // ---------- РЕКОРДЫ ----------
+    // ---------- ПРОГРЕСС ----------
     saveScore(score) {
         if (score <= 0) return;
         const entry = { score, date: new Date().toLocaleDateString('ru-RU') };
@@ -575,102 +509,122 @@ class SnakeGame {
         this.updateBestUI();
     }
 
+    unlockAchievement(id) {
+        if (this.achievements[id]) return;
+        const ach = ACHIEVEMENTS.find(a => a.id === id);
+        if (!ach) return;
+        this.achievements[id] = true;
+        LS.set('achievements', this.achievements);
+        sound.achievement();
+        vibrate(100);
+        toast(`${ach.icon} Достижение: ${ach.name}`);
+    }
+
+    loadTasks() {
+        const today = new Date().toDateString();
+        const saved = LS.get('tasks', null);
+        if (saved && saved.date === today) return saved;
+        const shuffled = [...TASK_POOL].sort(() => Math.random() - 0.5);
+        const tasks = shuffled.slice(0, 3).map(t => ({ ...t, progress: 0, done: false }));
+        const data = { date: today, tasks };
+        LS.set('tasks', data);
+        return data;
+    }
+
+    updateTaskProgress(type, amount = 1) {
+        let changed = false;
+        this.tasks.tasks.forEach(t => {
+            if (t.done) return;
+            if (t.type === type) {
+                t.progress = Math.min(t.target, t.progress + amount);
+                if (t.progress >= t.target) { t.done = true; toast(`✅ Задание: ${t.title}`); }
+                changed = true;
+            }
+        });
+        if (changed) LS.set('tasks', this.tasks);
+    }
+
     // ---------- МОДАЛКИ ----------
     showTop() {
         const list = $('top-list');
         list.innerHTML = '';
         if (!this.topScores.length) {
-            list.innerHTML = '<li style="justify-content:center;color:var(--text-dim);border:none;background:none;">Пока нет рекордов</li>';
+            list.innerHTML = '<li style="justify-content:center">Пока нет рекордов</li>';
         } else {
             this.topScores.forEach((entry, i) => {
                 const li = document.createElement('li');
-                li.innerHTML = `<span class="rank">#${i + 1}</span><span class="val">${entry.score}</span><span class="date">${entry.date}</span>`;
+                li.innerHTML = `<span>#${i + 1} — ${entry.score}</span><span class="date">${entry.date}</span>`;
                 list.appendChild(li);
             });
         }
-        $('top-modal').classList.remove('hidden');
+        $('modal-top').classList.remove('hidden');
     }
 
     showSkins() {
         const list = $('skins-list');
         list.innerHTML = '';
         SKINS.forEach(skin => {
-            const unlocked = this.isSkinUnlocked(skin);
+            const unlocked = skin.unlock.type === 'default' || 
+                             (skin.unlock.type === 'score' && this.maxScore >= skin.unlock.value) ||
+                             (skin.unlock.type === 'achievement' && this.achievements[skin.unlock.value]);
             const active = this.skins.active === skin.id && unlocked;
+            
             const card = document.createElement('div');
-            card.className = 'skin-card' + (unlocked ? '' : ' locked') + (active ? ' active' : '');
-
-            let previewHtml = '';
+            card.className = `skin-card ${unlocked ? '' : 'locked'} ${active ? 'active' : ''}`;
+            
+            let preview = '';
             if (skin.color === 'rainbow') {
-                previewHtml = `<div class="skin-dot" style="color:#ff00d4;background:linear-gradient(45deg,#ff00d4,#00f0ff,#39ff14)"></div>
-                               <div class="skin-dot" style="color:#00f0ff;background:linear-gradient(45deg,#ffd700,#ff00d4)"></div>
-                               <div class="skin-dot" style="color:#39ff14;background:linear-gradient(45deg,#39ff14,#00f0ff)"></div>`;
+                preview = `<div class="skin-dot" style="background:linear-gradient(45deg,#ff453a,#ffd700,#30d158)"></div>`;
             } else {
-                previewHtml = `<div class="skin-dot" style="color:${skin.color};background:${skin.color}"></div>
-                               <div class="skin-dot" style="color:${skin.color};background:${skin.color};opacity:0.6"></div>
-                               <div class="skin-dot" style="color:${skin.color};background:${skin.color};opacity:0.3"></div>`;
-            }
-
-            let statusText = '';
-            if (active) statusText = '✓ Активен';
-            else if (unlocked) statusText = 'Нажми';
-            else if (skin.unlock.type === 'score') statusText = `Нужно ${skin.unlock.value} очков`;
-            else if (skin.unlock.type === 'achievement') {
-                const ach = ACHIEVEMENTS.find(a => a.id === skin.unlock.value);
-                statusText = `🏅 ${ach?.name || '?'}`;
+                preview = `<div class="skin-dot" style="background:${skin.color}"></div>`;
             }
 
             card.innerHTML = `
-                <div class="skin-preview">${previewHtml}</div>
+                <div class="skin-preview">${preview}</div>
                 <div class="skin-name">${skin.name}</div>
-                <div class="skin-status">${statusText}</div>
+                <div class="skin-status">${active ? 'Активен' : unlocked ? 'Выбрать' : 'Закрыт'}</div>
             `;
-
+            
             if (unlocked) {
                 card.onclick = () => {
                     sound.click();
                     this.skins.active = skin.id;
                     LS.set('skins', this.skins);
                     this.showSkins();
-                    toast(`Скин «${skin.name}» выбран`);
                 };
             }
             list.appendChild(card);
         });
-        $('skins-modal').classList.remove('hidden');
+        $('modal-skins').classList.remove('hidden');
     }
 
     showSettings() {
-        $('settings-modal').classList.remove('hidden');
+        $('modal-settings').classList.remove('hidden');
     }
 
     showTasks() {
         const list = $('tasks-list');
         const reset = $('tasks-reset');
         list.innerHTML = '';
-
+        
         const now = new Date();
         const tomorrow = new Date(now);
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(0, 0, 0, 0);
-        const hoursLeft = Math.ceil((tomorrow - now) / 3600000);
-        reset.textContent = `Обновление через ${hoursLeft} ч.`;
+        reset.textContent = `Обновление через ${Math.ceil((tomorrow - now) / 3600000)} ч.`;
 
         this.tasks.tasks.forEach(t => {
             const card = document.createElement('div');
-            card.className = 'task-card' + (t.done ? ' completed' : '');
+            card.className = `task-card ${t.done ? 'completed' : ''}`;
             const progress = t.done ? 100 : (t.progress / t.target) * 100;
             card.innerHTML = `
                 <div class="task-title">${t.done ? '✅ ' : ''}${t.title}</div>
                 <div class="task-progress"><div class="task-progress-bar" style="width:${progress}%"></div></div>
-                <div class="task-meta">
-                    <span>${t.progress}/${t.target}</span>
-                    <span class="task-reward">+${t.reward} 🏅</span>
-                </div>
+                <div class="task-meta"><span>${t.progress}/${t.target}</span><span>+${t.reward} 🏅</span></div>
             `;
             list.appendChild(card);
         });
-        $('tasks-modal').classList.remove('hidden');
+        $('modal-tasks').classList.remove('hidden');
     }
 
     showAchievements() {
@@ -679,44 +633,35 @@ class SnakeGame {
         ACHIEVEMENTS.forEach(ach => {
             const unlocked = this.achievements[ach.id];
             const el = document.createElement('div');
-            el.className = 'achievement' + (unlocked ? ' unlocked' : ' locked');
+            el.className = `achievement ${unlocked ? '' : 'locked'}`;
             el.innerHTML = `
                 <div class="achievement-icon">${unlocked ? ach.icon : '🔒'}</div>
-                <div class="achievement-info">
+                <div>
                     <div class="achievement-name">${ach.name}</div>
                     <div class="achievement-desc">${ach.desc}</div>
                 </div>
             `;
             list.appendChild(el);
         });
-        $('achievements-modal').classList.remove('hidden');
+        $('modal-achievements').classList.remove('hidden');
     }
-
-    // ---------- ОВЕРЛЕЙ ----------
-    showOverlay(title, text, btnText, btn2Text) {
-        $('overlay-title').textContent = title;
-        $('overlay-text').textContent = text;
-        $('overlay-btn').textContent = btnText;
-        if (typeof btn2Text === 'string') {
-            $('overlay-btn2').textContent = btn2Text;
-            $('overlay-btn2').classList.remove('hidden');
-        } else {
-            $('overlay-btn2').classList.add('hidden');
-        }
-        $('overlay').classList.remove('hidden');
-    }
-
-    hideOverlay() { $('overlay').classList.add('hidden'); }
 
     // ---------- ОТРИСОВКА ----------
+    getCurrentSkin() {
+        return SKINS.find(s => s.id === this.skins.active) || SKINS[0];
+    }
+
     draw() {
+        if (!this.canvasSize) return;
         const s = this.canvasSize;
         ctx.clearRect(0, 0, s, s);
-        ctx.fillStyle = '#121829';
+        
+        // Фон
+        ctx.fillStyle = COLORS.bg;
         ctx.fillRect(0, 0, s, s);
 
         // Сетка
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.04)';
+        ctx.strokeStyle = COLORS.grid;
         ctx.lineWidth = 1;
         for (let i = 0; i <= GRID; i++) {
             const p = i * this.tileSize;
@@ -725,35 +670,30 @@ class SnakeGame {
         }
 
         // Лабиринт
-        for (const m of this.maze) {
-            const x = m.x * this.tileSize;
-            const y = m.y * this.tileSize;
-            ctx.fillStyle = '#9d4edd';
-            ctx.shadowColor = '#9d4edd';
-            ctx.shadowBlur = 12;
-            ctx.fillRect(x + 3, y + 3, this.tileSize - 6, this.tileSize - 6);
-            ctx.shadowBlur = 0;
-        }
+        this.maze.forEach(m => {
+            ctx.fillStyle = COLORS.maze;
+            ctx.beginPath();
+            ctx.roundRect(m.x * this.tileSize + 2, m.y * this.tileSize + 2, this.tileSize - 4, this.tileSize - 4, 4);
+            ctx.fill();
+        });
 
         // Еда
         if (this.food) {
-            const color = FOOD_TYPES[this.foodType].color;
+            const ft = FOOD_TYPES[this.foodType];
             const fx = this.food.x * this.tileSize + this.tileSize / 2;
             const fy = this.food.y * this.tileSize + this.tileSize / 2;
-            const r = this.tileSize * 0.32;
-            const pulse = 1 + Math.sin(performance.now() / 200) * 0.15;
-
-            const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, r * 3 * pulse);
-            grad.addColorStop(0, color + 'aa');
-            grad.addColorStop(1, color + '00');
-            ctx.fillStyle = grad;
-            ctx.beginPath(); ctx.arc(fx, fy, r * 3 * pulse, 0, Math.PI * 2); ctx.fill();
-
-            ctx.fillStyle = color;
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 20;
-            ctx.beginPath(); ctx.arc(fx, fy, r * pulse, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0;
+            const r = this.tileSize * 0.35;
+            
+            ctx.fillStyle = ft.color;
+            ctx.beginPath();
+            ctx.arc(fx, fy, r, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Блик (объем)
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.arc(fx - r*0.3, fy - r*0.3, r*0.3, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         // Змейка
@@ -763,22 +703,27 @@ class SnakeGame {
             const y = seg.y * this.tileSize;
             const pad = 2;
             const size = this.tileSize - pad * 2;
-
+            
             let color = skin.color;
             if (color === 'rainbow') {
-                const hue = (performance.now() / 20 + i * 25) % 360;
-                color = `hsl(${hue}, 100%, 60%)`;
+                color = `hsl(${(performance.now() / 10 + i * 20) % 360}, 80%, 60%)`;
             }
 
-            if (i === 0) {
-                ctx.fillStyle = color;
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 12;
-                ctx.fillRect(x + pad, y + pad, size, size);
-                ctx.shadowBlur = 0;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(x + pad, y + pad, size, size, i === 0 ? 8 : 4);
+            ctx.fill();
 
-                ctx.fillStyle = '#0a0e1a';
-                const eye = size * 0.18;
+            // Объем (блик)
+            if (i === 0) {
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.beginPath();
+                ctx.roundRect(x + pad + 2, y + pad + 2, size - 4, size / 2.5, 6);
+                ctx.fill();
+                
+                // Глаза
+                ctx.fillStyle = '#000';
+                const eye = size * 0.15;
                 const cx = x + pad + size / 2;
                 const cy = y + pad + size / 2;
                 const off = size * 0.22;
@@ -788,24 +733,6 @@ class SnakeGame {
                 const py = this.dir.y !== 0 ? 0 : off * 0.7;
                 ctx.beginPath(); ctx.arc(cx + ex + px, cy + ey + py, eye, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.arc(cx + ex - px, cy + ey - py, eye, 0, Math.PI * 2); ctx.fill();
-            } else {
-                const intensity = 1 - i / this.snake.length;
-                if (skin.color === 'rainbow') {
-                    ctx.fillStyle = color;
-                    ctx.globalAlpha = 0.4 + intensity * 0.6;
-                } else {
-                    // Разбор hex в rgba
-                    const hex = skin.color.replace('#', '');
-                    const r2 = parseInt(hex.substr(0, 2), 16);
-                    const g2 = parseInt(hex.substr(2, 2), 16);
-                    const b2 = parseInt(hex.substr(4, 2), 16);
-                    ctx.fillStyle = `rgba(${r2}, ${g2}, ${b2}, ${0.4 + intensity * 0.6})`;
-                }
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 6;
-                ctx.fillRect(x + pad, y + pad, size, size);
-                ctx.shadowBlur = 0;
-                ctx.globalAlpha = 1;
             }
         });
 
@@ -813,24 +740,24 @@ class SnakeGame {
         for (const p of this.particles) {
             ctx.globalAlpha = p.life;
             ctx.fillStyle = p.color;
-            ctx.shadowColor = p.color;
-            ctx.shadowBlur = 10;
-            ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill();
         }
         ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
 
         // Индикатор замедления
         if (performance.now() < this.slowUntil) {
             const remaining = (this.slowUntil - performance.now()) / 5000;
-            ctx.fillStyle = 'rgba(57, 255, 20, 0.8)';
+            ctx.fillStyle = COLORS.slow;
             ctx.fillRect(0, s - 4, s * remaining, 4);
         }
 
-        // HUD-индикаторы
         $('slow-indicator').classList.toggle('hidden', performance.now() >= this.slowUntil);
         $('maze-indicator').classList.toggle('hidden', this.maze.length === 0);
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => new SnakeGame());
+// Запуск
+window.addEventListener('DOMContentLoaded', () => {
+    if (window.SnakeGameInstance) return;
+    window.SnakeGameInstance = new SnakeGame();
+});
