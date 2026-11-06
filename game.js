@@ -1,4 +1,3 @@
-// ============ TELEGRAM ============
 const tg = window.Telegram?.WebApp;
 if (tg) {
     tg.ready();
@@ -6,7 +5,6 @@ if (tg) {
     tg.setHeaderColor('#1c1c1e');
 }
 
-// ============ КОНСТАНТЫ ============
 const GRID = 20;
 
 const FOOD_TYPES = {
@@ -45,7 +43,6 @@ const TASK_POOL = [
     { id: 'eat_3_slow',     title: 'Съесть 3 бонуса замедления',  target: 3,   reward: 20, type: 'slow' },
 ];
 
-// ============ УТИЛИТЫ ============
 const $ = id => document.getElementById(id);
 const LS = {
     get(key, def) {
@@ -57,7 +54,6 @@ const LS = {
     }
 };
 
-// ============ ЗВУК ============
 class Sound {
     constructor() {
         this.ctx = null;
@@ -95,7 +91,6 @@ class Sound {
 }
 const sound = new Sound();
 
-// ============ ХЕЛПЕРЫ UI ============
 function toast(text) {
     const container = document.querySelector('.toast-container') || (() => {
         const c = document.createElement('div');
@@ -116,7 +111,6 @@ function vibrate(ms = 15) {
     if (navigator.vibrate) navigator.vibrate(ms);
 }
 
-// ============ ИГРА ============
 class SnakeGame {
     constructor() {
         this.boardEl = $('board');
@@ -171,7 +165,10 @@ class SnakeGame {
             sound.click();
             $('screen-main').classList.remove('active');
             $('screen-game').classList.add('active');
-            this.start();
+            setTimeout(() => {
+                this.buildGrid(); 
+                this.start();
+            }, 50);
         };
 
         $('btn-menu').onclick = () => { sound.click(); this.togglePause(); $('modal-menu').classList.remove('hidden'); };
@@ -274,7 +271,7 @@ class SnakeGame {
         $('overlay').classList.add('hidden');
         this.spawnFood();
         this.updateScoreUI();
-        this.render(); // Первая отрисовка
+        this.render(); 
         this.lastTick = performance.now();
         requestAnimationFrame((t) => this.loop(t));
     }
@@ -362,7 +359,7 @@ class SnakeGame {
             this.snake.pop();
         }
         
-        this.render(); // Отрисовка после каждого шага
+        this.render();
     }
 
     spawnMaze() {
@@ -526,7 +523,7 @@ class SnakeGame {
                     this.skins.active = skin.id;
                     LS.set('skins', this.skins);
                     this.showSkins();
-                    this.render(); // Перерисовать змейку новым цветом
+                    this.render();
                 };
             }
             list.appendChild(card);
@@ -580,39 +577,33 @@ class SnakeGame {
         $('modal-achievements').classList.remove('hidden');
     }
 
-    // --- РЕНДЕР БЕЗ CANVAS ---
     render() {
-        // Очищаем все ячейки
         for (let i = 0; i < GRID * GRID; i++) {
-            $('cell-' + i).className = 'cell';
+            const cell = $('cell-' + i);
+            if (cell) cell.className = 'cell';
         }
 
-        // Лабиринт
         this.maze.forEach(m => {
             const idx = m.y * GRID + m.x;
-            $('cell-' + idx).classList.add('maze');
+            const cell = $('cell-' + idx);
+            if (cell) cell.classList.add('maze');
         });
 
-        // Еда
         if (this.food) {
             const idx = this.food.y * GRID + this.food.x;
             const cell = $('cell-' + idx);
-            cell.classList.add(FOOD_TYPES[this.foodType].cssClass);
+            if (cell) cell.classList.add(FOOD_TYPES[this.foodType].cssClass);
         }
 
-        // Змейка
         const skin = SKINS.find(s => s.id === this.skins.active) || SKINS[0];
         this.snake.forEach((seg, i) => {
             const idx = seg.y * GRID + seg.x;
             const cell = $('cell-' + idx);
+            if (!cell) return;
             
             if (i === 0) {
                 cell.classList.add('snake-head');
-                if (skin.color === 'rainbow') {
-                    cell.style.background = 'hsl(' + ((performance.now() / 10) % 360) + ', 80%, 60%)';
-                } else {
-                    cell.style.background = skin.color;
-                }
+                cell.style.background = skin.color === 'rainbow' ? 'hsl(' + ((performance.now() / 10) % 360) + ', 80%, 60%)' : skin.color;
             } else {
                 cell.classList.add('snake-body');
                 if (skin.color === 'rainbow') {
@@ -624,7 +615,6 @@ class SnakeGame {
             }
         });
 
-        // Индикаторы
         $('slow-indicator').classList.toggle('hidden', performance.now() >= this.slowUntil);
         $('maze-indicator').classList.toggle('hidden', this.maze.length === 0);
     }
