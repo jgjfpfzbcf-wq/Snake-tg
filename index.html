@@ -25,6 +25,10 @@
 
         <div class="game-wrapper">
             <canvas id="game"></canvas>
+            <div class="hud">
+                <div id="slow-indicator" class="hud-badge hidden">⚡ Замедление</div>
+                <div id="maze-indicator" class="hud-badge hidden">🌀 Лабиринт</div>
+            </div>
             <div id="overlay" class="overlay hidden">
                 <div class="overlay-content">
                     <h2 id="overlay-title">Пауза</h2>
@@ -36,9 +40,12 @@
         </div>
 
         <div class="controls">
-            <button id="pause-btn" class="btn-secondary">⏸ Пауза</button>
-            <button id="restart-btn" class="btn-secondary">↻ Заново</button>
-            <button id="top-btn" class="btn-secondary">🏆 Топ-10</button>
+            <button id="pause-btn" class="btn-secondary">⏸</button>
+            <button id="restart-btn" class="btn-secondary">↻</button>
+            <button id="top-btn" class="btn-secondary">🏆</button>
+            <button id="skins-btn" class="btn-secondary">🎨</button>
+            <button id="settings-btn" class="btn-secondary">⚙️</button>
+            <button id="tasks-btn" class="btn-secondary">📋</button>
         </div>
 
         <div class="hint">Свайпай или используй стрелки / WASD</div>
@@ -50,6 +57,60 @@
             <h2>🏆 Топ-10 рекордов</h2>
             <ol id="top-list" class="top-list"></ol>
             <button id="close-top" class="btn-primary">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Модалка скинов -->
+    <div id="skins-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>🎨 Скины змейки</h2>
+            <div id="skins-list" class="skins-list"></div>
+            <button id="close-skins" class="btn-primary">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Модалка настроек -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>⚙️ Настройки</h2>
+            <div class="settings-list">
+                <label class="toggle-row">
+                    <span>Режим «Без стен»</span>
+                    <input type="checkbox" id="toggle-walls" class="toggle">
+                </label>
+                <label class="toggle-row">
+                    <span>Лабиринт (со 100 очков)</span>
+                    <input type="checkbox" id="toggle-maze" class="toggle">
+                </label>
+                <label class="toggle-row">
+                    <span>Звуки</span>
+                    <input type="checkbox" id="toggle-sound" class="toggle" checked>
+                </label>
+                <label class="toggle-row">
+                    <span>Вибрация</span>
+                    <input type="checkbox" id="toggle-vibration" class="toggle" checked>
+                </label>
+            </div>
+            <button id="close-settings" class="btn-primary">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Модалка заданий -->
+    <div id="tasks-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>📋 Ежедневные задания</h2>
+            <p id="tasks-reset" class="tasks-reset"></p>
+            <div id="tasks-list" class="tasks-list"></div>
+            <button id="close-tasks" class="btn-primary">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Модалка достижений -->
+    <div id="achievements-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>🏅 Достижения</h2>
+            <div id="achievements-list" class="achievements-list"></div>
+            <button id="close-achievements" class="btn-primary">Закрыть</button>
         </div>
     </div>
 
