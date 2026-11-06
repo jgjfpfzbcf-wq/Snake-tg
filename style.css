@@ -1,0 +1,312 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+    --bg: #0a0e1a;
+    --bg-2: #121829;
+    --neon-cyan: #00f0ff;
+    --neon-pink: #ff00d4;
+    --neon-purple: #9d4edd;
+    --neon-green: #39ff14;
+    --neon-gold: #ffd700;
+    --text: #e0e6ff;
+    --text-dim: #6b7394;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(ellipse at top, #1a1f3a 0%, var(--bg) 60%);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+    user-select: none;
+    touch-action: none;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Фоновая сетка */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.container {
+    width: 100%;
+    max-width: 440px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.neon-title {
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow:
+        0 0 8px var(--neon-cyan),
+        0 0 20px var(--neon-cyan),
+        0 0 40px rgba(0, 240, 255, 0.5);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { text-shadow: 0 0 8px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px rgba(0, 240, 255, 0.5); }
+    50% { text-shadow: 0 0 12px var(--neon-cyan), 0 0 30px var(--neon-cyan), 0 0 60px rgba(0, 240, 255, 0.8); }
+}
+
+.scores {
+    display: flex;
+    gap: 10px;
+}
+
+.score-box {
+    background: rgba(18, 24, 41, 0.8);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: 6px 14px;
+    border-radius: 10px;
+    text-align: center;
+    min-width: 74px;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.15), inset 0 0 12px rgba(0, 240, 255, 0.05);
+}
+
+.score-box .label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.score-box span:last-child {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+}
+
+.game-wrapper {
+    position: relative;
+    border-radius: 16px;
+    padding: 8px;
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(255, 0, 212, 0.2));
+    box-shadow:
+        0 0 30px rgba(0, 240, 255, 0.2),
+        0 0 60px rgba(255, 0, 212, 0.1);
+}
+
+#game {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    background: var(--bg-2);
+}
+
+.overlay {
+    position: absolute;
+    inset: 8px;
+    background: rgba(10, 14, 26, 0.92);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    z-index: 10;
+    animation: fadeIn 0.2s ease;
+}
+
+.overlay.hidden {
+    display: none;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.overlay-content {
+    text-align: center;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
+}
+
+.overlay-content h2 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 15px var(--neon-cyan);
+}
+
+.overlay-content p {
+    color: var(--text-dim);
+    font-size: 15px;
+}
+
+.controls {
+    display: flex;
+    gap: 8px;
+}
+
+button {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: rgba(18, 24, 41, 0.8);
+    color: var(--text);
+}
+
+button:active {
+    transform: scale(0.96);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+    border: none;
+    color: #000;
+    font-weight: 800;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(18, 24, 41, 0.8);
+    color: var(--neon-cyan);
+}
+
+.btn-secondary:hover {
+    background: rgba(0, 240, 255, 0.1);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+}
+
+.hint {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+}
+
+/* Модалка топ-10 */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 16, 0.9);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 16px;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: var(--bg-2);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 0 40px rgba(0, 240, 255, 0.2);
+}
+
+.modal-content h2 {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 18px;
+    color: var(--neon-gold);
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+}
+
+.top-list {
+    list-style: none;
+    margin-bottom: 18px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.top-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    background: rgba(0, 240, 255, 0.05);
+    border-left: 3px solid var(--neon-cyan);
+    border-radius: 6px;
+    font-size: 15px;
+    color: var(--text);
+    animation: slideIn 0.3s ease;
+}
+
+.top-list li:nth-child(1) { border-color: var(--neon-gold); }
+.top-list li:nth-child(2) { border-color: #c0c0c0; }
+.top-list li:nth-child(3) { border-color: #cd7f32; }
+
+.top-list li .rank {
+    font-weight: 800;
+    color: var(--neon-cyan);
+    min-width: 30px;
+}
+
+.top-list li .val {
+    font-weight: 800;
+    color: var(--neon-pink);
+    text-shadow: 0 0 8px rgba(255, 0, 212, 0.5);
+}
+
+.top-list li .date {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.hidden {
+    display: none !important;
+}
+
+.top-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.top-list::-webkit-scrollbar-thumb {
+    background: var(--neon-cyan);
+    border-radius: 2px;
+}
