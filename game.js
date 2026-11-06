@@ -578,23 +578,32 @@ class SnakeGame {
     }
 
     render() {
+        // Очищаем все ячейки (и классы, и стили)
         for (let i = 0; i < GRID * GRID; i++) {
             const cell = $('cell-' + i);
-            if (cell) cell.className = 'cell';
+            if (cell) {
+                cell.className = 'cell';
+                cell.style.background = ''; // Очищаем цвет
+                cell.style.opacity = '';    // Очищаем прозрачность
+                cell.style.boxShadow = '';  // Очищаем тень
+            }
         }
 
+        // Лабиринт
         this.maze.forEach(m => {
             const idx = m.y * GRID + m.x;
             const cell = $('cell-' + idx);
             if (cell) cell.classList.add('maze');
         });
 
+        // Еда
         if (this.food) {
             const idx = this.food.y * GRID + this.food.x;
             const cell = $('cell-' + idx);
             if (cell) cell.classList.add(FOOD_TYPES[this.foodType].cssClass);
         }
 
+        // Змейка
         const skin = SKINS.find(s => s.id === this.skins.active) || SKINS[0];
         this.snake.forEach((seg, i) => {
             const idx = seg.y * GRID + seg.x;
@@ -615,6 +624,7 @@ class SnakeGame {
             }
         });
 
+        // Индикаторы
         $('slow-indicator').classList.toggle('hidden', performance.now() >= this.slowUntil);
         $('maze-indicator').classList.toggle('hidden', this.maze.length === 0);
     }
