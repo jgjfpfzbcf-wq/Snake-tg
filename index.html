@@ -3,123 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Neon Snake</title>
+    <title>Snake</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1 class="neon-title">SNAKE</h1>
-            <div class="scores">
+    <!-- ЭКРАН 1: ГЛАВНОЕ МЕНЮ -->
+    <div id="screen-main" class="screen active">
+        <div class="main-content">
+            <div class="logo-container">
+                <div class="logo-snake">🐍</div>
+                <h1 class="game-logo">SNAKE</h1>
+            </div>
+            <button id="btn-play" class="btn-main">ИГРАТЬ</button>
+            <div class="main-best-box">
+                <span class="label">ЛИЧНЫЙ РЕКОРД</span>
+                <span id="main-best" class="value">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 2: ИГРА -->
+    <div id="screen-game" class="screen hidden">
+        <div class="game-header">
+            <button id="btn-menu" class="btn-icon">☰</button>
+            <div class="score-container">
                 <div class="score-box">
                     <span class="label">СЧЁТ</span>
-                    <span id="score">0</span>
+                    <span id="score" class="value">0</span>
                 </div>
                 <div class="score-box">
                     <span class="label">РЕКОРД</span>
-                    <span id="best">0</span>
-                </div>
-            </div>
-        </header>
-
-        <div class="game-wrapper">
-            <canvas id="game"></canvas>
-            <div class="hud">
-                <div id="slow-indicator" class="hud-badge hidden">⚡ Замедление</div>
-                <div id="maze-indicator" class="hud-badge hidden">🌀 Лабиринт</div>
-            </div>
-            <div id="overlay" class="overlay hidden">
-                <div class="overlay-content">
-                    <h2 id="overlay-title">Пауза</h2>
-                    <p id="overlay-text"></p>
-                    <button id="overlay-btn" class="btn-primary">Продолжить</button>
-                    <button id="overlay-btn2" class="btn-secondary hidden">Топ-10</button>
+                    <span id="best" class="value">0</span>
                 </div>
             </div>
         </div>
 
-        <div class="controls">
-            <button id="pause-btn" class="btn-secondary">⏸</button>
-            <button id="restart-btn" class="btn-secondary">↻</button>
-            <button id="top-btn" class="btn-secondary">🏆</button>
-            <button id="skins-btn" class="btn-secondary">🎨</button>
-            <button id="settings-btn" class="btn-secondary">⚙️</button>
-            <button id="tasks-btn" class="btn-secondary">📋</button>
-        </div>
+        <div class="game-area">
+            <div class="canvas-wrapper">
+                <canvas id="game"></canvas>
+                <div class="hud">
+                    <div id="slow-indicator" class="hud-badge hidden">⚡ Замедление</div>
+                    <div id="maze-indicator" class="hud-badge hidden">🌀 Лабиринт</div>
+                </div>
+                <div id="overlay" class="overlay hidden">
+                    <div class="overlay-card">
+                        <h2 id="overlay-title">Пауза</h2>
+                        <p id="overlay-text"></p>
+                        <button id="overlay-btn" class="btn-main">Продолжить</button>
+                    </div>
+                </div>
+            </div>
 
-        <div class="hint">Свайпай или используй стрелки / WASD</div>
+            <div class="dpad-container">
+                <div class="dpad">
+                    <button class="dpad-btn dpad-up" data-dir="up">▲</button>
+                    <button class="dpad-btn dpad-left" data-dir="left">◀</button>
+                    <div class="dpad-center"></div>
+                    <button class="dpad-btn dpad-right" data-dir="right">▶</button>
+                    <button class="dpad-btn dpad-down" data-dir="down">▼</button>
+                </div>
+            </div>
+        </div>
     </div>
-<!-- Экранный джойстик -->
-        <div class="dpad-container">
-            <div class="dpad">
-                <button class="dpad-btn dpad-up" data-dir="up">▲</button>
-                <button class="dpad-btn dpad-left" data-dir="left">◀</button>
-                <div class="dpad-center"></div>
-                <button class="dpad-btn dpad-right" data-dir="right">▶</button>
-                <button class="dpad-btn dpad-down" data-dir="down">▼</button>
+
+    <!-- МОДАЛКА: МЕНЮ -->
+    <div id="modal-menu" class="modal hidden">
+        <div class="modal-content">
+            <h2>Меню</h2>
+            <div class="menu-buttons">
+                <button id="menu-resume" class="btn-secondary">▶ Продолжить</button>
+                <button id="menu-restart" class="btn-secondary">↻ Заново</button>
+                <div class="divider"></div>
+                <button id="menu-top" class="btn-secondary">🏆 Топ-10</button>
+                <button id="menu-skins" class="btn-secondary">🎨 Скины</button>
+                <button id="menu-tasks" class="btn-secondary">📋 Задания</button>
+                <button id="menu-achievements" class="btn-secondary">🏅 Достижения</button>
+                <button id="menu-settings" class="btn-secondary">⚙️ Настройки</button>
+                <div class="divider"></div>
+                <button id="menu-exit" class="btn-danger">🚪 Главное меню</button>
             </div>
         </div>
-    <!-- Модалка топ-10 -->
-    <div id="top-modal" class="modal hidden">
+    </div>
+
+    <!-- МОДАЛКИ: КОНТЕНТ -->
+    <div id="modal-top" class="modal hidden">
         <div class="modal-content">
-            <h2>🏆 Топ-10 рекордов</h2>
+            <h2>🏆 Топ-10</h2>
             <ol id="top-list" class="top-list"></ol>
-            <button id="close-top" class="btn-primary">Закрыть</button>
+            <button class="btn-main close-modal">Закрыть</button>
         </div>
     </div>
 
-    <!-- Модалка скинов -->
-    <div id="skins-modal" class="modal hidden">
+    <div id="modal-skins" class="modal hidden">
         <div class="modal-content">
-            <h2>🎨 Скины змейки</h2>
+            <h2>🎨 Скины</h2>
             <div id="skins-list" class="skins-list"></div>
-            <button id="close-skins" class="btn-primary">Закрыть</button>
+            <button class="btn-main close-modal">Закрыть</button>
         </div>
     </div>
 
-    <!-- Модалка настроек -->
-    <div id="settings-modal" class="modal hidden">
+    <div id="modal-settings" class="modal hidden">
         <div class="modal-content">
             <h2>⚙️ Настройки</h2>
             <div class="settings-list">
-                <label class="toggle-row">
-                    <span>Режим «Без стен»</span>
-                    <input type="checkbox" id="toggle-walls" class="toggle">
-                </label>
-                <label class="toggle-row">
-                    <span>Лабиринт (со 100 очков)</span>
-                    <input type="checkbox" id="toggle-maze" class="toggle">
-                </label>
-                <label class="toggle-row">
-                    <span>Звуки</span>
-                    <input type="checkbox" id="toggle-sound" class="toggle" checked>
-                </label>
-                <label class="toggle-row">
-                    <span>Вибрация</span>
-                    <input type="checkbox" id="toggle-vibration" class="toggle" checked>
-                </label>
+                <label class="toggle-row"><span>Без стен</span><input type="checkbox" id="toggle-walls" class="toggle"></label>
+                <label class="toggle-row"><span>Лабиринт</span><input type="checkbox" id="toggle-maze" class="toggle"></label>
+                <label class="toggle-row"><span>Звуки</span><input type="checkbox" id="toggle-sound" class="toggle"></label>
+                <label class="toggle-row"><span>Вибрация</span><input type="checkbox" id="toggle-vibration" class="toggle"></label>
             </div>
-            <button id="close-settings" class="btn-primary">Закрыть</button>
+            <button class="btn-main close-modal">Закрыть</button>
         </div>
     </div>
 
-    <!-- Модалка заданий -->
-    <div id="tasks-modal" class="modal hidden">
+    <div id="modal-tasks" class="modal hidden">
         <div class="modal-content">
-            <h2>📋 Ежедневные задания</h2>
+            <h2>📋 Задания</h2>
             <p id="tasks-reset" class="tasks-reset"></p>
             <div id="tasks-list" class="tasks-list"></div>
-            <button id="close-tasks" class="btn-primary">Закрыть</button>
+            <button class="btn-main close-modal">Закрыть</button>
         </div>
     </div>
 
-    <!-- Модалка достижений -->
-    <div id="achievements-modal" class="modal hidden">
+    <div id="modal-achievements" class="modal hidden">
         <div class="modal-content">
             <h2>🏅 Достижения</h2>
             <div id="achievements-list" class="achievements-list"></div>
-            <button id="close-achievements" class="btn-primary">Закрыть</button>
+            <button class="btn-main close-modal">Закрыть</button>
         </div>
     </div>
 
