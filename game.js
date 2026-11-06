@@ -87,6 +87,7 @@ class Sound {
         this.init();
         if (!this.ctx) return;
         try {
+            if (this.ctx.state === 'suspended') this.ctx.resume();
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
             osc.type = type;
@@ -129,13 +130,39 @@ function vibrate(ms = 15) {
     if (navigator.vibrate) navigator.vibrate(ms);
 }
 
+// Безопасная отрисовка скругленных прямоугольников (работает везде)
+function drawRoundedRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+}
+
 // ============ ИГРА ============
 class SnakeGame {
     constructor() {
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
+        this.settings = {
+            noWalls: LS.get('noWalls', false),
+            mazeEnabled: LS.get('mazeEnabled', true),
+            sound: LS.get('sound', true),
+            vibration: LS.get('vibration', true),
+        };
+        sound.enabled = this.settings.sound;
 
-        // Состояние игры
+        this.topScores = LS.get('top', []);
+        this.achievements = LS.get('achievements', {});
+        this.skins = LS.get('skins', { active: 'green' });
+        this.totalGold = LS.get('totalGold', 0);
+        this.maxScore = LS.get('maxScore', 0);
+        this.tasks = this.loadTasks();
+        
         this.snake = [];
         this.dir = { x: 1, y: 0 };
         this.nextDir = { x: 1, y: 0 };
@@ -151,56 +178,44 @@ class SnakeGame {
         this.lastTick = 0;
         this.particles = [];
         this.slowUntil = 0;
-        this.newBest = false;
-        this.gameStats = { gold: 0, normal: 0, slow: 0 };
-
-        // Настройки
-        this.settings = {
-            noWalls: LS.get('noWalls', false),
-            mazeEnabled: LS.get('mazeEnabled', true),
-            sound: LS.get('sound', true),
-            vibration: LS.get('vibration', true),
-        };
-        sound.enabled = this.settings.sound;
-
-        // Прогресс
-        this.topScores = LS.get('top', []);
-        this.achievements = LS.get('achievements', {});
-        this.skins = LS.get('skins', { active: 'green' });
-        this.totalGold = LS.get('totalGold', 0);
-        this.maxScore = LS.get('maxScore', 0);
-        this.tasks = this.loadTasks();
+        this.canvasSize = 0;
+        this.tileSize = 0;
 
         this.initUI();
         this.bindEvents();
         this.updateBestUI();
-        this.draw(); // Отрисовать пустое поле на фоне
     }
 
     resize() {
-        const size = canvas.clientWidth;
-        if (!size) return;
+        const wrapper = document.querySelector('.canvas-wrapper');
+        if (!wrapper) return;
+        const size = wrapper.clientWidth;
+        if (size === 0) return;
+
         const dpr = window.devicePixelRatio || 1;
         canvas.width = size * dpr;
         canvas.height = size * dpr;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.tileSize = size / GRID;
         this.canvasSize = size;
+        
         if (this.running) this.draw();
     }
 
     // ---------- UI ИНИЦИАЛИЗАЦИЯ ----------
     initUI() {
-        // Экраны
         $('btn-play').onclick = () => {
             sound.click();
             $('screen-main').classList.remove('active');
             $('screen-game').classList.add('active');
-            setTimeout(() => this.resize(), 50); // Пересчитать размер canvas
-            this.start();
+            
+            // Ждем, пока экран отрисуется, и запускаем
+            setTimeout(() => {
+                this.resize();
+                this.start();
+            }, 100);
         };
 
-        // Меню
         $('btn-menu').onclick = () => { sound.click(); this.togglePause(); $('modal-menu').classList.remove('hidden'); };
         $('menu-resume').onclick = () => { sound.click(); $('modal-menu').classList.add('hidden'); this.togglePause(); };
         $('menu-restart').onclick = () => { sound.click(); $('modal-menu').classList.add('hidden'); this.start(); };
@@ -214,14 +229,12 @@ class SnakeGame {
             this.updateBestUI();
         };
 
-        // Открытие модалок из меню
         $('menu-top').onclick = () => { sound.click(); this.showTop(); };
         $('menu-skins').onclick = () => { sound.click(); this.showSkins(); };
         $('menu-settings').onclick = () => { sound.click(); this.showSettings(); };
         $('menu-tasks').onclick = () => { sound.click(); this.showTasks(); };
         $('menu-achievements').onclick = () => { sound.click(); this.showAchievements(); };
 
-        // Закрытие модалок
         document.querySelectorAll('.close-modal').forEach(btn => {
             btn.onclick = () => {
                 sound.click();
@@ -229,7 +242,6 @@ class SnakeGame {
             };
         });
 
-        // Оверлей (пауза / смерть)
         $('overlay-btn').onclick = () => {
             sound.click();
             if (this.over) {
@@ -240,7 +252,6 @@ class SnakeGame {
             }
         };
 
-        // Настройки
         $('toggle-walls').checked = this.settings.noWalls;
         $('toggle-maze').checked = this.settings.mazeEnabled;
         $('toggle-sound').checked = this.settings.sound;
@@ -250,16 +261,16 @@ class SnakeGame {
         $('toggle-maze').onchange = (e) => { this.settings.mazeEnabled = e.target.checked; LS.set('mazeEnabled', this.settings.mazeEnabled); };
         $('toggle-sound').onchange = (e) => { this.settings.sound = e.target.checked; LS.set('sound', this.settings.sound); sound.enabled = this.settings.sound; sound.click(); };
         $('toggle-vibration').onchange = (e) => { this.settings.vibration = e.target.checked; LS.set('vibration', this.settings.vibration); vibrate(); };
+
+        window.addEventListener('resize', () => this.resize());
     }
 
     bindEvents() {
-        // Клавиатура
         document.addEventListener('keydown', (e) => {
             const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
             if (map[e.key]) { e.preventDefault(); this.setDirection(map[e.key]); }
         });
 
-        // Свайпы
         let sx = 0, sy = 0;
         canvas.addEventListener('touchstart', (e) => {
             const t = e.changedTouches[0];
@@ -275,7 +286,6 @@ class SnakeGame {
             else this.setDirection(dy > 0 ? 'down' : 'up');
         }, { passive: true });
 
-        // Джойстик
         document.querySelectorAll('.dpad-btn').forEach(btn => {
             btn.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
@@ -295,7 +305,6 @@ class SnakeGame {
     }
 
     start() {
-        this.resize();
         this.snake = [{ x: 10, y: 10 }];
         this.dir = { x: 1, y: 0 };
         this.nextDir = { x: 1, y: 0 };
@@ -307,7 +316,6 @@ class SnakeGame {
         this.running = true;
         this.particles = [];
         this.maze = [];
-        this.gameStats = { gold: 0, normal: 0, slow: 0 };
         
         $('overlay').classList.add('hidden');
         this.spawnFood();
@@ -350,7 +358,6 @@ class SnakeGame {
         this.dir = { ...this.nextDir };
         let head = { x: this.snake[0].x + this.dir.x, y: this.snake[0].y + this.dir.y };
 
-        // Телепорт
         if (this.settings.noWalls) {
             if (head.x < 0) head.x = GRID - 1;
             if (head.x >= GRID) head.x = 0;
@@ -370,7 +377,6 @@ class SnakeGame {
             this.score += ft.points;
             this.spawnParticles(head.x, head.y, ft.color);
 
-            this.gameStats[this.foodType.toLowerCase()]++;
             if (this.foodType === 'GOLD') {
                 this.totalGold++;
                 LS.set('totalGold', this.totalGold);
@@ -484,7 +490,7 @@ class SnakeGame {
     updateScoreUI() {
         $('score').textContent = this.score;
         const best = this.topScores[0]?.score || 0;
-        if (this.score > best) { this.newBest = true; $('best').textContent = this.score; }
+        if (this.score > best) { $('best').textContent = this.score; }
     }
 
     updateBestUI() {
@@ -498,7 +504,6 @@ class SnakeGame {
         if (this.score > prevBest && !this.newBest) { this.newBest = true; vibrate(150); }
     }
 
-    // ---------- ПРОГРЕСС ----------
     saveScore(score) {
         if (score <= 0) return;
         const entry = { score, date: new Date().toLocaleDateString('ru-RU') };
@@ -544,7 +549,6 @@ class SnakeGame {
         if (changed) LS.set('tasks', this.tasks);
     }
 
-    // ---------- МОДАЛКИ ----------
     showTop() {
         const list = $('top-list');
         list.innerHTML = '';
@@ -598,9 +602,7 @@ class SnakeGame {
         $('modal-skins').classList.remove('hidden');
     }
 
-    showSettings() {
-        $('modal-settings').classList.remove('hidden');
-    }
+    showSettings() { $('modal-settings').classList.remove('hidden'); }
 
     showTasks() {
         const list = $('tasks-list');
@@ -646,21 +648,15 @@ class SnakeGame {
         $('modal-achievements').classList.remove('hidden');
     }
 
-    // ---------- ОТРИСОВКА ----------
-    getCurrentSkin() {
-        return SKINS.find(s => s.id === this.skins.active) || SKINS[0];
-    }
+    getCurrentSkin() { return SKINS.find(s => s.id === this.skins.active) || SKINS[0]; }
 
     draw() {
         if (!this.canvasSize) return;
         const s = this.canvasSize;
         ctx.clearRect(0, 0, s, s);
-        
-        // Фон
         ctx.fillStyle = COLORS.bg;
         ctx.fillRect(0, 0, s, s);
 
-        // Сетка
         ctx.strokeStyle = COLORS.grid;
         ctx.lineWidth = 1;
         for (let i = 0; i <= GRID; i++) {
@@ -669,15 +665,12 @@ class SnakeGame {
             ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(s, p); ctx.stroke();
         }
 
-        // Лабиринт
         this.maze.forEach(m => {
             ctx.fillStyle = COLORS.maze;
-            ctx.beginPath();
-            ctx.roundRect(m.x * this.tileSize + 2, m.y * this.tileSize + 2, this.tileSize - 4, this.tileSize - 4, 4);
+            drawRoundedRect(ctx, m.x * this.tileSize + 2, m.y * this.tileSize + 2, this.tileSize - 4, this.tileSize - 4, 4);
             ctx.fill();
         });
 
-        // Еда
         if (this.food) {
             const ft = FOOD_TYPES[this.foodType];
             const fx = this.food.x * this.tileSize + this.tileSize / 2;
@@ -689,14 +682,12 @@ class SnakeGame {
             ctx.arc(fx, fy, r, 0, Math.PI * 2);
             ctx.fill();
             
-            // Блик (объем)
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             ctx.beginPath();
             ctx.arc(fx - r*0.3, fy - r*0.3, r*0.3, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Змейка
         const skin = this.getCurrentSkin();
         this.snake.forEach((seg, i) => {
             const x = seg.x * this.tileSize;
@@ -710,18 +701,14 @@ class SnakeGame {
             }
 
             ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.roundRect(x + pad, y + pad, size, size, i === 0 ? 8 : 4);
+            drawRoundedRect(ctx, x + pad, y + pad, size, size, i === 0 ? 8 : 4);
             ctx.fill();
 
-            // Объем (блик)
             if (i === 0) {
                 ctx.fillStyle = 'rgba(255,255,255,0.3)';
-                ctx.beginPath();
-                ctx.roundRect(x + pad + 2, y + pad + 2, size - 4, size / 2.5, 6);
+                drawRoundedRect(ctx, x + pad + 2, y + pad + 2, size - 4, size / 2.5, 6);
                 ctx.fill();
                 
-                // Глаза
                 ctx.fillStyle = '#000';
                 const eye = size * 0.15;
                 const cx = x + pad + size / 2;
@@ -736,7 +723,6 @@ class SnakeGame {
             }
         });
 
-        // Частицы
         for (const p of this.particles) {
             ctx.globalAlpha = p.life;
             ctx.fillStyle = p.color;
@@ -744,7 +730,6 @@ class SnakeGame {
         }
         ctx.globalAlpha = 1;
 
-        // Индикатор замедления
         if (performance.now() < this.slowUntil) {
             const remaining = (this.slowUntil - performance.now()) / 5000;
             ctx.fillStyle = COLORS.slow;
@@ -756,7 +741,6 @@ class SnakeGame {
     }
 }
 
-// Запуск
 window.addEventListener('DOMContentLoaded', () => {
     if (window.SnakeGameInstance) return;
     window.SnakeGameInstance = new SnakeGame();
