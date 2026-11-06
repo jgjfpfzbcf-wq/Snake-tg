@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Snake</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -41,9 +41,7 @@
 
         <div class="game-area">
             <div class="board-wrapper">
-                <!-- Сетка будет генерироваться через JS -->
                 <div id="board" class="board"></div>
-                
                 <div class="hud">
                     <div id="slow-indicator" class="hud-badge hidden">⚡ Замедление</div>
                     <div id="maze-indicator" class="hud-badge hidden">🌀 Лабиринт</div>
