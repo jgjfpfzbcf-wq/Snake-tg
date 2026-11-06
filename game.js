@@ -334,6 +334,17 @@ class SnakeGame {
             if (Math.abs(dx) > Math.abs(dy)) this.setDirection(dx > 0 ? 'right' : 'left');
             else this.setDirection(dy > 0 ? 'down' : 'up');
         }, { passive: true });
+
+        // 👇 НОВЫЙ БЛОК: Управление экранным джойстиком
+        document.querySelectorAll('.dpad-btn').forEach(btn => {
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault(); // убирает задержку и двойной тап
+                const dir = btn.getAttribute('data-dir');
+                this.setDirection(dir);
+                sound.click(); // звук нажатия
+            });
+        });
+        // 👆 КОНЕЦ НОВОГО БЛОКА
     }
 
     setDirection(dirName) {
